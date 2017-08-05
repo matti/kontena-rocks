@@ -1,0 +1,167 @@
+#!/usr/bin/env sh
+
+set -e
+
+case "$1" in
+  "setup")
+    set +e
+      kontena plugin uninstall --force vagrant
+    set -e
+    kontena plugin install vagrant
+
+    set +e
+      killall VBoxHeadless
+    set -e
+    brew cask reinstall virtualbox
+
+    brew cask reinstall vagrant
+
+    VBoxManage --version
+    vagrant -v
+    kontena plugin ls
+  ;;
+
+  "master")
+    case "$2" in
+      "create")
+        kontena vagrant master create \
+          --name kontena-master \
+          --memory 384 \
+          --vault-secret kontenarockskontenarockskontenarockskontenarockskontenarockskont \
+          --vault-iv kontenarockskontenarockskontenarockskontenarockskontenarockskont \
+          --skip-auth-provider
+
+        curl http://192.168.66.100:8080
+      ;;
+      "destroy")
+        kontena vagrant master terminate
+      ;;
+      "stop")
+        kontena vagrant master stop
+      ;;
+      "start")
+        kontena vagrant master start
+      ;;
+      "restart")
+        $0 master stop
+        $0 master start
+      ;;
+      "ssh")
+        kontena vagrant master ssh
+      ;;
+      "logs")
+        kontena vagrant master ssh docker logs -f kontena-server-api
+      ;;
+      "journal")
+        kontena vagrant master ssh journalctl -f
+      ;;
+      *)
+        echo "USAGE: krocks master create|destroy|start|stop|restart|ssh|logs|journal"
+        exit 1
+      ;;
+    esac
+  ;;
+
+  "grid")
+    kontena master use kontena-master
+
+    case "$2" in
+      "create")
+        kontena grid create \
+          --initial-size "${GRID_INITIAL_SIZE:-1}" \
+          "${GRID_NAME:-rocks}"
+      ;;
+      "destroy")
+        $0 node destroy
+        kontena grid rm --force "${GRID_NAME:-rocks}"
+      ;;
+      *)
+        echo "USAGE: krocks grid create|destroy"
+        exit 1
+      ;;
+    esac
+  ;;
+
+  "node")
+    case "$2" in
+      "create")
+        kontena vagrant node create \
+          --grid "${GRID_NAME:-rocks}" \
+          --instances "${GRID_INSTANCES:-1}" \
+          --memory "${GRID_NODE_MEMORY:-1024}" \
+          --network-address "${GRID_IP_START:-192.168.66.101}" \
+          "${GRID_NAME:-rocks}"
+
+        kontena node ls
+        $0 node fixdns
+      ;;
+      "fixdns")
+        echo "Fix dns with manual ip (https://github.com/kontena/kontena-plugin-vagrant/issues/48)"
+        kontena vagrant node ssh "${GRID_NAME:-rocks}-1" sudo sed -i '/nameserver 172.28.128.1/d' /etc/resolv.conf
+      ;;
+      "destroy")
+        set +e
+          kontena vagrant node terminate --grid "${GRID_NAME:-rocks}" --force "${GRID_NAME:-rocks}"-1
+        set -e
+      ;;
+      "stop")
+        kontena vagrant node stop ${GRID_NAME:-rocks}-1
+      ;;
+      "start")
+        kontena vagrant node start ${GRID_NAME:-rocks}-1
+      ;;
+      "restart")
+        $0 node stop
+        $0 node start
+      ;;
+      "ssh")
+        kontena vagrant node ssh ${GRID_NAME:-rocks}-1
+      ;;
+      "logs")
+        kontena vagrant node ssh ${GRID_NAME:-rocks}-1 docker logs -f kontena-agent
+      ;;
+      "journal")
+        kontena vagrant node ssh ${GRID_NAME:-rocks}-1 journalctl -f
+      ;;
+      *)
+        echo "USAGE: krocks node start|stop|restart|ssh|logs|journal"
+        exit 1
+      ;;
+    esac
+  ;;
+
+  "stop")
+    $0 node stop
+    $0 master stop
+  ;;
+  "start")
+    $0 master start
+    $0 node start
+  ;;
+  "restart")
+    $0 stop
+    $0 start
+  ;;
+
+  "install")
+    dir=$( cd -P -- "$(dirname -- "$(command -v -- "$0")")" && pwd -P )
+
+    if [ "$subcommand" ]; then
+      target=$subcommand
+    else
+      target=/usr/local/bin/krocks
+    fi
+
+    if [ ! -e "$target" ]; then
+      ln -s $dir/krocks $target
+      echo "Created symlink in $target"
+    else
+      echo "Already exists in $target"
+      exit 1
+    fi
+  ;;
+  *)
+    echo "USAGE: krocks stop|start|restart|install|master|grid|node"
+    exit 1
+  ;;
+esac
