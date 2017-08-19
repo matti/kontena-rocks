@@ -5,8 +5,13 @@ A local Kontena setup on steroids with real SSL cert and domain (.kontena.rocks)
 ```
 bin/krocks install
 krocks master create
-[GRID_NAME=rocks] krocks grid create
+krocks grid create [rocks]
 [GRID_NAME=rocks] [GRID_NODE_MEMORY=1024] [GRID_INSTANCES=1] [GRID_IP_START=192.168.66.101] krocks node create
+```
+
+```
+krocks node logs
+krocks node logs 1
 ```
 
 ## demo

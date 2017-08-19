@@ -67,13 +67,14 @@ case "$1" in
 
     case "$2" in
       "create")
+        grid_name=${1:-rocks}
         kontena grid create \
           --initial-size "${GRID_INITIAL_SIZE:-1}" \
-          "${GRID_NAME:-rocks}"
+          "$grid_name"
       ;;
       "destroy")
         $0 node destroy
-        kontena grid rm --force "${GRID_NAME:-rocks}"
+        kontena grid rm --force "${GRID_NAME:-$(kontena grid current --name)}"
       ;;
       *)
         echo "USAGE: krocks grid create|destroy"
@@ -86,42 +87,43 @@ case "$1" in
     case "$2" in
       "create")
         kontena vagrant node create \
-          --grid "${GRID_NAME:-rocks}" \
+          --grid "${GRID_NAME:-$(kontena grid current --name)}" \
           --instances "${GRID_INSTANCES:-1}" \
           --memory "${GRID_NODE_MEMORY:-1024}" \
           --network-address "${GRID_IP_START:-192.168.66.101}" \
-          "${GRID_NAME:-rocks}"
+          "${GRID_NAME:-$(kontena grid current --name)}"
 
         kontena node ls
         $0 node fixdns
       ;;
       "fixdns")
         echo "Fix dns with manual ip (https://github.com/kontena/kontena-plugin-vagrant/issues/48)"
-        kontena vagrant node ssh "${GRID_NAME:-rocks}-1" sudo sed -i '/nameserver 172.28.128.1/d' /etc/resolv.conf
+        kontena vagrant node ssh "${GRID_NAME:-$(kontena grid current --name)}-1" sudo sed -i '/nameserver 172.28.128.1/d' /etc/resolv.conf
       ;;
       "destroy")
         set +e
-          kontena vagrant node terminate --grid "${GRID_NAME:-rocks}" --force "${GRID_NAME:-rocks}"-1
+          kontena vagrant node terminate --grid "${GRID_NAME:-$(kontena grid current --name)}" --force "${GRID_NAME:-$(kontena grid current --name)}"-1
         set -e
       ;;
+      "restart")
+        shift; shift
+        $0 node stop $@
+        $0 node start $@
+      ;;
       "stop")
-        kontena vagrant node stop ${GRID_NAME:-rocks}-1
+        kontena vagrant node stop ${GRID_NAME:-$(kontena grid current --name)}-${3:-1}
       ;;
       "start")
-        kontena vagrant node start ${GRID_NAME:-rocks}-1
-      ;;
-      "restart")
-        $0 node stop
-        $0 node start
+        kontena vagrant node start ${GRID_NAME:-$(kontena grid current --name)}-${3:-1}
       ;;
       "ssh")
-        kontena vagrant node ssh ${GRID_NAME:-rocks}-1
+        kontena vagrant node ssh ${GRID_NAME:-$(kontena grid current --name)}-${3:-1}
       ;;
       "logs")
-        kontena vagrant node ssh ${GRID_NAME:-rocks}-1 docker logs -f kontena-agent
+        kontena vagrant node ssh ${GRID_NAME:-$(kontena grid current --name)}-${3:-1} docker logs -f kontena-agent
       ;;
       "journal")
-        kontena vagrant node ssh ${GRID_NAME:-rocks}-1 journalctl -f
+        kontena vagrant node ssh ${GRID_NAME:-$(kontena grid current --name)}-${3:-1} journalctl -f
       ;;
       *)
         echo "USAGE: krocks node start|stop|restart|ssh|logs|journal"
