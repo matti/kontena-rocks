@@ -132,13 +132,47 @@ case "$1" in
     esac
   ;;
 
+  "use")
+    kontena master use kontena-master
+  ;;
+
   "stop")
-    $0 node stop
+    $0 use
+
+    nodes=$(kontena node ls -q)
+    node_stop_pids=""
+    for node_name in $nodes; do
+      node_index=$(echo $node_name | cut -d- -f2)
+      $0 node stop $node_index &
+      node_stop_pids="$node_stop_pids $!"
+    done
+
     $0 master stop
+    wait $node_stop_pids
   ;;
   "start")
+    $0 use
     $0 master start
-    $0 node start
+
+    while true; do
+      set +e
+        nodes=$(kontena node ls -q 2>/dev/null)
+        node_ls_exit=$?
+      set -e
+
+      [ "$node_ls_exit" = 0 ] && break
+      echo "waiting for master to start responding.."
+      sleep 1
+    done
+
+    node_start_pids=""
+    for node_name in $nodes; do
+      node_index=$(echo $node_name | cut -d- -f2)
+      $0 node start $node_index &
+      node_start_pids="$node_start_pids $!"
+    done
+
+    wait $node_start_pids
   ;;
   "restart")
     $0 stop
