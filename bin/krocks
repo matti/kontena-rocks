@@ -26,7 +26,7 @@ case "$1" in
       "create")
         kontena vagrant master create \
           --name kontena-master \
-          --memory 384 \
+          --memory 1024 \
           --vault-secret kontenarockskontenarockskontenarockskontenarockskontenarockskont \
           --vault-iv kontenarockskontenarockskontenarockskontenarockskontenarockskont \
           --skip-auth-provider
@@ -67,10 +67,13 @@ case "$1" in
 
     case "$2" in
       "create")
+        shift; shift
         grid_name=${1:-rocks}
         kontena grid create \
           --initial-size "${GRID_INITIAL_SIZE:-1}" \
           "$grid_name"
+
+        kontena grid trusted-subnet add --grid "$grid_name" "${GRID_TRUSTED_SUBNET:-192.168.0.0/16}"
       ;;
       "destroy")
         $0 node destroy
@@ -94,15 +97,20 @@ case "$1" in
           "${GRID_NAME:-$(kontena grid current --name)}"
 
         kontena node ls
-        $0 node fixdns
+
+        nodes=$(kontena node ls -q)
+        for node_name in $nodes; do
+          node_index=$(echo $node_name | cut -d- -f2)
+          $0 node fixdns $node_index
+        done
       ;;
       "fixdns")
         echo "Fix dns with manual ip (https://github.com/kontena/kontena-plugin-vagrant/issues/48)"
-        kontena vagrant node ssh "${GRID_NAME:-$(kontena grid current --name)}-1" sudo sed -i '/nameserver 172.28.128.1/d' /etc/resolv.conf
+        kontena vagrant node ssh "${GRID_NAME:-$(kontena grid current --name)}-${3:-1}" sudo sed -i '/nameserver 172.28.128.1/d' /etc/resolv.conf
       ;;
       "destroy")
         set +e
-          kontena vagrant node terminate --grid "${GRID_NAME:-$(kontena grid current --name)}" --force "${GRID_NAME:-$(kontena grid current --name)}"-1
+          kontena vagrant node terminate --grid "${GRID_NAME:-$(kontena grid current --name)}" --force "${GRID_NAME:-$(kontena grid current --name)}"-${3:-1}
         set -e
       ;;
       "restart")
@@ -179,6 +187,18 @@ case "$1" in
     $0 start
   ;;
 
+  "destroy")
+    nodes=$(kontena node ls -q 2>/dev/null)
+    for node_name in $nodes; do
+      node_index=$(echo $node_name | cut -d- -f2)
+      $0 node destroy $node_index &
+      node_start_pids="$node_start_pids $!"
+    done
+
+    wait $node_start_pids
+    $0 master destroy
+  ;;
+
   "install")
     dir=$( cd -P -- "$(dirname -- "$(command -v -- "$0")")" && pwd -P )
 
@@ -197,7 +217,7 @@ case "$1" in
     fi
   ;;
   *)
-    echo "USAGE: krocks stop|start|restart|install|master|grid|node"
+    echo "USAGE: krocks stop|start|restart|install|master|grid|node|destroy"
     exit 1
   ;;
 esac
