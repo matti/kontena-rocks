@@ -217,7 +217,7 @@ case "$1" in
     fi
   ;;
   *)
-    echo "USAGE: krocks stop|start|restart|install|master|grid|node|destroy"
+    echo "USAGE: krocks setup|stop|start|restart|install|master|grid|node|destroy"
     exit 1
   ;;
 esac
