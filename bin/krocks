@@ -134,7 +134,7 @@ case "$1" in
         kontena vagrant node ssh ${GRID_NAME:-$(kontena grid current --name)}-${3:-1} journalctl -f
       ;;
       *)
-        echo "USAGE: krocks node start|stop|restart|ssh|logs|journal"
+        echo "USAGE: krocks node create|destroy|start|stop|restart|ssh|logs|journal|fixdns"
         exit 1
       ;;
     esac
